@@ -36,3 +36,12 @@ It creates or extendes an sqlite database in the local working directory:
 
   obs-git-lfs.db
 
+
+The git repository with the package sources need to provide a .lfsconfig file
+with
+
+[lfs]
+  url = http://gitea.opensuse.org:9999/gitlfs
+
+defining the service
+
