@@ -33,7 +33,7 @@ use Data::Dumper;
 
 use strict;
 
-my $db_file = "/tmp/obs-git-lfs.db";
+my $db_file = "obs-git-lfs.db";
 
 if (! -e "$db_file") {
   my $h = BSSQLite::connectdb($db_file);
