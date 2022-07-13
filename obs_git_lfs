@@ -1,0 +1,132 @@
+#!/usr/bin/perl -w
+#
+# Copyright (c) 2022 Adrian Schroeter, SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+#
+# OBS Git LFS provider
+# 
+# This service answers git LFS requests and let OBS deliver the files
+# based on a static database.
+#
+# This is only supposed to be used for converted sources from classic
+# OBS source repositories. This is not supposed to be used for sources
+# which are supposed to be actively maintained in git directly.
+#
+
+BEGIN {
+  my ($wd) = $0 =~ m-(.*)/- ;
+  $wd ||= '.';
+  unshift @INC,  "$wd";
+}
+
+use Data::Dumper;
+use POSIX;
+use JSON::XS ();
+
+use BSServer;
+use BSSQLite;
+use BSDispatch;
+
+use strict;
+
+my $port = 9999;
+my $proto = 'http';
+
+my $db;
+my $db_file = "/etc/obs-git-lfs.db";
+
+sub getgitlfs {
+
+  my $oiddata = BSServer::read_data(10000000) if BSServer::have_content();
+  my $oid = JSON::XS::decode_json($oiddata);
+
+  # use Data::Dumper;
+  # print $oiddata;
+  # print Dumper($oid);
+
+  die("not a download operation") unless $oid->{'operation'} eq 'download';
+  die("not using sha256 operation") unless $oid->{'hash_algo'} eq 'sha256';
+
+  my $sha = $oid->{'objects'}[0]->{'oid'};
+  my $size = $oid->{'objects'}[0]->{'size'};
+
+  my $h = $db || BSSQLite::connectdb($db_file);
+  my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ?", $sha, $size);
+  #  print Dumper(@ary);
+  die("Not found in database") unless @ary eq 4;
+
+  my $projid = $ary[0];
+  my $package = $ary[1];
+  my $filename = $ary[2];
+  my $md5 = $ary[3];
+
+  my $url = "https://api.opensuse.org/public/source/$projid/$package/$filename?rev=$md5";
+
+  print "$sha $size: $url\n";
+
+  my $resp = {
+           transfer => 'basic',
+           hash_algo => 'sha256',
+           objects => [{
+             oid => $sha,
+             size => $size + 0, # must be an integer
+             authenticated => JSON::XS::false,
+             actions => {
+               download => {
+                 href => $url,
+               }
+             }
+     }],
+  };
+  #  print Dumper(JSON::XS::encode_json($resp));
+  return (JSON::XS::encode_json($resp), 'Content-Type: application/json');
+}
+
+sub reload {
+  $db->disconnect() if $db;
+  $db = undef;
+}
+
+sub hello {
+  my ($cgi) = @_;
+  return "<hello name=\"OBS git LFS Server\"/>\n";
+}
+
+# define server
+my $dispatches = [
+  '/' => \&hello,
+
+  'POST:/gitlfs/objects/batch' => \&getgitlfs,
+  'POST:/gitlfs/reload' => \&reload,
+];
+
+my $conf = {
+  'port' => $port,
+  'proto' => $proto,
+  'dispatch' => \&BSDispatch::dispatch,
+  'dispatches' => $dispatches,
+  'setkeepalive' => 1,
+  'maxchild' => 20,
+};
+
+
+BSDispatch::compile($conf);
+BSServer::serveropen($port);
+BSServer::server($conf);
+
+

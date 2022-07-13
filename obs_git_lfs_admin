@@ -1,0 +1,101 @@
+#!/usr/bin/perl -w
+#
+# Copyright (c) 2022 Adrian Schroeter, SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+#
+# OBS Git LFS provider --- admin tool
+#
+
+BEGIN {
+  my ($wd) = $0 =~ m-(.*)/- ;
+  $wd ||= '.';
+  unshift @INC,  "$wd";
+}
+
+use BSUtil;
+use BSSQLite;
+use Digest::SHA;
+use Data::Dumper;
+
+use strict;
+
+my $db;
+my $db_file = "/tmp/obs-git-lfs.db";
+
+if ( ! -e "$db_file" ) {
+  $db = BSSQLite::connectdb($db_file);
+  my %dbtables = map {$_ => 1} BSSQLite::list_tables($db);
+  if (!$dbtables{'lfs_oids'}) {
+    BSSQLite::dbdo($db, <<'EOS');
+  CREATE TABLE IF NOT EXISTS lfs_oids(
+    project TEXT,
+    package TEXT,
+    filename TEXT,
+    rev TEXT,
+    sha256 TEXT,
+    size INTEGER,
+    UNIQUE(project,package,rev)
+  )
+EOS
+  }
+  BSSQLite::dbdo($db, 'CREATE INDEX IF NOT EXISTS oid_idx on lfs_oids(sha256,size)');
+};
+
+my $projid;
+my $packid;
+my $filename;
+my $rev;
+my $sha256;
+my $size;
+if ( @ARGV eq 4 ){
+  $projid = shift @ARGV;
+  $packid = shift @ARGV;
+  $rev = shift @ARGV;
+  $filename = shift @ARGV;
+
+  my $fd;
+  open($fd, '<', $filename) || die("$filename $!\n");
+  my $ctx = Digest::SHA->new(256);
+  $ctx->addfile($fd);
+  close($fd);
+  $sha256 = $ctx->hexdigest();
+
+  $size = -s $filename;
+  $filename =~ s/.*\///;
+  print " $size $sha256 $filename\n";
+} elsif ( @ARGV eq 6 ){
+  $projid = shift @ARGV;
+  $packid = shift @ARGV;
+  $filename = shift @ARGV;
+  $rev = shift @ARGV;
+  $sha256 = shift @ARGV;
+  $size = shift @ARGV;
+} else {
+  print "I need exactly these parameters in this order:\n";
+  print "  project package source-revision-of-expanded-package filename file-sha256 file-size-in-byte\n";
+  print "or \n";
+  print "  project package source-revision-of-expanded-package local_file_with_correct_filename\n";
+  exit(1);
+}
+
+
+my $h = $db->{'sqlite'} || BSSQLite::connectdb($db_file);
+BSSQLite::begin_work($h);
+BSSQLite::dbdo_bind($h, 'INSERT OR IGNORE INTO lfs_oids(project,package,filename,rev,sha256,size) VALUES(?,?,?,?,?,?)', [ $projid ], [ $packid ], [ $filename ], [ $rev ], [ $sha256 ], [ $size ]);
+BSSQLite::commit($h);
+
