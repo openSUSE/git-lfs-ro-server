@@ -49,7 +49,7 @@ if ( ! -e "$db_file" ) {
     rev TEXT,
     sha256 TEXT,
     size INTEGER,
-    UNIQUE(project,package,rev)
+    UNIQUE(project,package,rev,filename)
   )
 EOS
   }
