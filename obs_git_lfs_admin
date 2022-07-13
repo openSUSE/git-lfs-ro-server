@@ -27,21 +27,19 @@ BEGIN {
   unshift @INC,  "$wd";
 }
 
-use BSUtil;
 use BSSQLite;
 use Digest::SHA;
 use Data::Dumper;
 
 use strict;
 
-my $db;
 my $db_file = "/tmp/obs-git-lfs.db";
 
-if ( ! -e "$db_file" ) {
-  $db = BSSQLite::connectdb($db_file);
-  my %dbtables = map {$_ => 1} BSSQLite::list_tables($db);
+if (! -e "$db_file") {
+  my $h = BSSQLite::connectdb($db_file);
+  my %dbtables = map {$_ => 1} BSSQLite::list_tables($h);
   if (!$dbtables{'lfs_oids'}) {
-    BSSQLite::dbdo($db, <<'EOS');
+    BSSQLite::dbdo($h, <<'EOS');
   CREATE TABLE IF NOT EXISTS lfs_oids(
     project TEXT,
     package TEXT,
@@ -53,8 +51,8 @@ if ( ! -e "$db_file" ) {
   )
 EOS
   }
-  BSSQLite::dbdo($db, 'CREATE INDEX IF NOT EXISTS oid_idx on lfs_oids(sha256,size)');
-};
+  BSSQLite::dbdo($h, 'CREATE INDEX IF NOT EXISTS oid_idx on lfs_oids(sha256,size)');
+}
 
 my $projid;
 my $packid;
@@ -62,29 +60,20 @@ my $filename;
 my $rev;
 my $sha256;
 my $size;
-if ( @ARGV == 4 ){
-  $projid = shift @ARGV;
-  $packid = shift @ARGV;
-  $rev = shift @ARGV;
-  $filename = shift @ARGV;
 
+if (@ARGV == 4) {
+  ($projid, $packid, $rev, $filename) = @ARGV;
   my $fd;
   open($fd, '<', $filename) || die("$filename $!\n");
+  $size = -s $fd;
   my $ctx = Digest::SHA->new(256);
   $ctx->addfile($fd);
   close($fd);
   $sha256 = $ctx->hexdigest();
-
-  $size = -s $filename;
   $filename =~ s/.*\///;
   print " $size $sha256 $filename\n";
-} elsif ( @ARGV == 6 ){
-  $projid = shift @ARGV;
-  $packid = shift @ARGV;
-  $filename = shift @ARGV;
-  $rev = shift @ARGV;
-  $sha256 = shift @ARGV;
-  $size = shift @ARGV;
+} elsif (@ARGV == 6){
+  ($projid, $packid, $filename, $rev, $sha256, $size) = @ARGV;
 } else {
   print "I need exactly these parameters in this order:\n";
   print "  project package source-revision-of-expanded-package filename file-sha256 file-size-in-byte\n";
@@ -93,8 +82,7 @@ if ( @ARGV == 4 ){
   exit(1);
 }
 
-
-my $h = $db->{'sqlite'} || BSSQLite::connectdb($db_file);
+my $h = BSSQLite::connectdb($db_file);
 BSSQLite::begin_work($h);
 BSSQLite::dbdo_bind($h, 'INSERT OR IGNORE INTO lfs_oids(project,package,filename,rev,sha256,size) VALUES(?,?,?,?,?,?)', [ $projid ], [ $packid ], [ $filename ], [ $rev ], [ $sha256 ], [ $size ]);
 BSSQLite::commit($h);
