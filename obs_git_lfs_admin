@@ -62,7 +62,7 @@ my $filename;
 my $rev;
 my $sha256;
 my $size;
-if ( @ARGV eq 4 ){
+if ( @ARGV == 4 ){
   $projid = shift @ARGV;
   $packid = shift @ARGV;
   $rev = shift @ARGV;
@@ -78,7 +78,7 @@ if ( @ARGV eq 4 ){
   $size = -s $filename;
   $filename =~ s/.*\///;
   print " $size $sha256 $filename\n";
-} elsif ( @ARGV eq 6 ){
+} elsif ( @ARGV == 6 ){
   $projid = shift @ARGV;
   $packid = shift @ARGV;
   $filename = shift @ARGV;

@@ -84,7 +84,7 @@ sub getgitlfs {
            hash_algo => 'sha256',
            objects => [{
              oid => $sha,
-             size => $size + 0, # must be an integer
+             size => int($size),
              authenticated => JSON::XS::false,
              actions => {
                download => {
