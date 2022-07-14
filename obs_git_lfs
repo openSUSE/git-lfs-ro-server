@@ -65,7 +65,7 @@ sub getgitlfs {
     my $oid = $obj->{'oid'};
     my $size = $obj->{'size'};
     my $r = { oid => $oid, size => int($size) };
-    my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ?", $oid, $size);
+    my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ?", lc($oid), $size);
     #  print Dumper(@ary);
     if (@ary != 4) {
       print "$oid/$size: not found\n";

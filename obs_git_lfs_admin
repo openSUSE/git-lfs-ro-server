@@ -73,7 +73,7 @@ if (@ARGV == 4) {
   $filename =~ s/.*\///;
   print " $size $sha256 $filename\n";
 } elsif (@ARGV == 6){
-  ($projid, $packid, $filename, $rev, $sha256, $size) = @ARGV;
+  ($projid, $packid, $rev, $filename, $sha256, $size) = @ARGV;
 } else {
   print "I need exactly these parameters in this order:\n";
   print "  project package source-revision-of-expanded-package filename file-sha256 file-size-in-byte\n";
@@ -81,6 +81,8 @@ if (@ARGV == 4) {
   print "  project package source-revision-of-expanded-package local_file_with_correct_filename\n";
   exit(1);
 }
+
+die("Revision must be a md5sum\n") unless $rev =~ /^[0-9a-f]{32}$/s;
 
 my $h = BSSQLite::connectdb($db_file);
 BSSQLite::begin_work($h);
