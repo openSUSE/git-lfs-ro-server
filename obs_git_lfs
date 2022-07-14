@@ -66,7 +66,18 @@ sub getgitlfs {
     my $size = $obj->{'size'};
     my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ?", $oid, $size);
     #  print Dumper(@ary);
-    die("$oid/$size not found in database") unless @ary == 4;
+    if (@ary != 4) {
+      print "ERROR: $oid/$size not found in database\n";
+      push @resobj, {
+        oid => $oid,
+        size => int($size),
+        error => {
+          code => 404,
+          message => "Object does not exist",
+        },
+      };
+      next;
+    };
     my ($projid, $packid, $filename, $md5) = @ary;
     my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
     print "$oid $size: $url\n";
