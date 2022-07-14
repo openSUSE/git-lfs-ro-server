@@ -57,7 +57,7 @@ sub getgitlfs {
   # print Dumper($batch);
 
   die("not a download operation\n") unless $batch->{'operation'} eq 'download';
-  die("409 not using sha256 as hash algo\n") unless $batch->{'hash_algo'} eq 'sha256';
+  die("409 not using sha256 as hash algo\n") if defined($batch->{'hash_algo'}) && $batch->{'hash_algo'} ne 'sha256';
 
   my $h = BSSQLite::connectdb($db_file);
   my @resobj;
