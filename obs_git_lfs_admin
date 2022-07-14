@@ -82,8 +82,18 @@ if (@ARGV == 4) {
   exit(1);
 }
 
+# normalize and verify
+$rev = lc($rev);
+$sha256 = lc($sha256);
+$size = 0 + $size;
 die("Revision must be a md5sum\n") unless $rev =~ /^[0-9a-f]{32}$/s;
+die("Oid must be a sha256sum\n") unless $sha256 =~ /^[0-9a-f]{64}$/s;
+die("Bad project\n") if !$projid || $projid =~ /[\/\000-\037]/  || ":$projid:" =~ /:[_\.:]/;
+die("Bad package\n") if !$packid || $packid =~ /[\/:\000-\037]/ || $packid =~ /^[_\.]/;
+die("Bad filename\n") if $filename =~ /[\/\000-\037]/ || $filename =~ /^\./;
+die("Bad size\n") if $size < 0;
 
+# add to database
 my $h = BSSQLite::connectdb($db_file);
 BSSQLite::begin_work($h);
 BSSQLite::dbdo_bind($h, 'INSERT OR IGNORE INTO lfs_oids(project,package,filename,rev,sha256,size) VALUES(?,?,?,?,?,?)', [ $projid ], [ $packid ], [ $filename ], [ $rev ], [ $sha256 ], [ $size ]);
