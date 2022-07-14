@@ -74,7 +74,7 @@ sub getgitlfs {
       my ($projid, $packid, $filename, $md5) = @ary;
       my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
       print "$oid $size: $url\n";
-      $r->{'authenticated'} = JSON::XS::false;
+      $r->{'authenticated'} = JSON::XS::true;
       $r->{'actions'} = { download => { href => $url } };
     }
     push @resobj, $r;
