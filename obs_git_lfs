@@ -99,10 +99,15 @@ sub getgitlfs {
   return (JSON::XS::encode_json($resp), 'Content-Type: application/json');
 }
 
+sub dummylock {
+  die('404 This is a read-only server');
+}
+
 # define server
 my $dispatches = [
   '/' => sub {("{\"name\": \"OBS git LFS Server\"}\n", 'Content-Type: application/json')},
   'POST:/gitlfs/objects/batch' => \&getgitlfs,
+  'POST:/gitlfs/locks/verify' => \&dummylock,
 ];
 
 my $conf = {
