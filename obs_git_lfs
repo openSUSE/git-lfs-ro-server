@@ -73,7 +73,7 @@ sub getgitlfs {
     } else {
       my ($projid, $packid, $filename, $md5) = @ary;
       my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
-      print "$oid $size: $url\n";
+      print "$oid/$size: $url\n";
       $r->{'authenticated'} = JSON::XS::true;
       $r->{'actions'} = { download => { href => $url } };
     }
@@ -102,6 +102,11 @@ sub errorreply {
   BSServer::reply("$err\n", "Status: $code $tag", 'Content-Type: application/json', @hdrs);
 }
 
+sub dispatch {
+  my ($conf, $req) = @_;
+  return BSDispatch::dispatch($conf, $req);
+}
+
 # define server
 my $dispatches = [
   '/' => \&hello,
@@ -112,7 +117,7 @@ my $dispatches = [
 my $conf = {
   'port' => $port,
   'proto' => $proto,
-  'dispatch' => \&BSDispatch::dispatch,
+  'dispatch' => \&dispatch,
   'dispatches' => $dispatches,
   'errorreply' => \&errorreply,
   'setkeepalive' => 1,
