@@ -57,38 +57,27 @@ sub getgitlfs {
   # print Dumper($batch);
 
   die("not a download operation\n") unless $batch->{'operation'} eq 'download';
-  die("not using sha256 as hash algo\n") unless $batch->{'hash_algo'} eq 'sha256';
+  die("409 not using sha256 as hash algo\n") unless $batch->{'hash_algo'} eq 'sha256';
 
   my $h = BSSQLite::connectdb($db_file);
   my @resobj;
   for my $obj (@{$batch->{'objects'}}) {
     my $oid = $obj->{'oid'};
     my $size = $obj->{'size'};
+    my $r = { oid => $oid, size => int($size) };
     my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ?", $oid, $size);
     #  print Dumper(@ary);
     if (@ary != 4) {
-      print "ERROR: $oid/$size not found in database\n";
-      push @resobj, {
-        oid => $oid,
-        size => int($size),
-        error => {
-          code => 404,
-          message => "Object does not exist",
-        },
-      };
-      next;
-    };
-    my ($projid, $packid, $filename, $md5) = @ary;
-    my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
-    print "$oid $size: $url\n";
-    push @resobj, {
-      oid => $oid,
-      size => int($size),
-      authenticated => JSON::XS::false,
-      actions => {
-	download => { href => $url, },
-      },
-    };
+      print "$oid/$size: not found\n";
+      $r->{'error'} = { code => 404, message => 'Object does not exist' };
+    } else {
+      my ($projid, $packid, $filename, $md5) = @ary;
+      my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
+      print "$oid $size: $url\n";
+      $r->{'authenticated'} = JSON::XS::false;
+      $r->{'actions'} = { download => { href => $url } };
+    }
+    push @resobj, $r;
   }
   my $resp = {
     transfer => 'basic',
@@ -100,12 +89,22 @@ sub getgitlfs {
 }
 
 sub dummylock {
-  die('404 This is a read-only server');
+  die("404 read-only server\n");
+}
+
+sub hello {
+  return ("{\"message\": \"OBS git LFS Server\"}\n", 'Content-Type: application/json');
+}
+
+sub errorreply {
+  my ($err, $code, $tag, @hdrs) = @_;
+  $err = JSON::XS::encode_json({'message' => $tag});
+  BSServer::reply("$err\n", "Status: $code $tag", 'Content-Type: application/json', @hdrs);
 }
 
 # define server
 my $dispatches = [
-  '/' => sub {("{\"name\": \"OBS git LFS Server\"}\n", 'Content-Type: application/json')},
+  '/' => \&hello,
   'POST:/gitlfs/objects/batch' => \&getgitlfs,
   'POST:/gitlfs/locks/verify' => \&dummylock,
 ];
@@ -115,10 +114,11 @@ my $conf = {
   'proto' => $proto,
   'dispatch' => \&BSDispatch::dispatch,
   'dispatches' => $dispatches,
+  'errorreply' => \&errorreply,
   'setkeepalive' => 1,
   'maxchild' => 20,
 };
 
 BSDispatch::compile($conf);
-BSServer::serveropen($port);
+BSServer::serveropen($conf->{'port'});
 BSServer::server($conf);
