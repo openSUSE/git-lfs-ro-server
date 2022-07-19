@@ -56,7 +56,7 @@ sub getgitlfs {
   # print $batch_json;
   # print Dumper($batch);
 
-  die("not a download operation\n") unless $batch->{'operation'} eq 'download';
+  die("not a supported operation: $batch->{'operation'}\n") unless $batch->{'operation'} eq 'download' || $batch->{'operation'} eq 'upload';
   die("409 not using sha256 as hash algo\n") if defined($batch->{'hash_algo'}) && $batch->{'hash_algo'} ne 'sha256';
 
   my $h = BSSQLite::connectdb($db_file);
@@ -69,8 +69,12 @@ sub getgitlfs {
     #  print Dumper(@ary);
     if (@ary != 4) {
       print "$oid/$size: not found\n";
-      $r->{'error'} = { code => 404, message => 'Object does not exist' };
-    } else {
+      if ($batch->{'operation'} eq 'upload') {
+         $r->{'error'} = { code => 403, message => 'LFS Upload is not supported by this read only server, check your .lfsconfig file' };
+      } else {
+         $r->{'error'} = { code => 404, message => 'Object does not exist' };
+      }
+    } elsif ($batch->{'operation'} eq 'download') {
       my ($projid, $packid, $filename, $md5) = @ary;
       my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
       print "$oid/$size: $url\n";
