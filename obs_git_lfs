@@ -48,6 +48,21 @@ my $proto = 'http';
 
 my $db_file = "/etc/obs-git-lfs.db";
 
+sub checkoid {
+  my ($cgi, $oid, $size) = @_;
+
+  my $h = BSSQLite::connectdb($db_file);
+  my $resp = { oid => $oid, size => int($size) };
+  my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ? LIMIT 1", lc($oid), $size);
+  if (@ary != 4) {
+	  BSServer::reply("No such OID\n", "Status: 404 not_found");
+  } else {
+	  my ($projid, $packid, $filename, $md5) = @ary;
+	  my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
+	  return ($url, 'Content-Type: text/plain');
+  }
+}
+
 sub getgitlfs {
   die("need batch data as content\n") unless BSServer::have_content();
   my $batch_json = BSServer::read_data(10000000);
@@ -114,9 +129,16 @@ sub dispatch {
 # define server
 my $dispatches = [
   '/' => \&hello,
+  'GET:/check/$oid/$size' => \&checkoid,
   'POST:/gitlfs/objects/batch' => \&getgitlfs,
   'POST:/gitlfs/locks/verify' => \&dummylock,
 ];
+
+sub verify_oid {
+}
+
+sub verify_num {
+}
 
 my $conf = {
   'port' => $port,
@@ -126,6 +148,7 @@ my $conf = {
   'errorreply' => \&errorreply,
   'setkeepalive' => 1,
   'maxchild' => 20,
+  'verifiers' => { oid => \&verify_oid, size => \&verify_num },
 };
 
 BSDispatch::compile($conf);
