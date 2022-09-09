@@ -40,15 +40,18 @@ use JSON::XS ();
 use BSServer;
 use BSDispatch;
 use BSSQLite;
-
+use DBI qw(:sql_types);
 use strict;
 
 my $port = 9999;
 my $proto = 'http';
 
 my $db_file = "/etc/obs-git-lfs.db";
+my $secret_file = "/etc/obs-git-lfs.secret";
 
-sub checkoid {
+my $secret;
+
+sub check_oid {
   my ($cgi, $oid, $size) = @_;
 
   my $h = BSSQLite::connectdb($db_file);
@@ -61,6 +64,25 @@ sub checkoid {
     my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename") . "?rev=$md5";
     return ($url, 'Content-Type: text/plain');
   }
+}
+
+sub add_oid {
+  die("need OID data as content\n") unless BSServer::have_content();
+  my $json = BSServer::read_data(10000) || die "Not enough data";
+  my $oid_data = JSON::XS::decode_json($json) || die "Not in json format";
+  die "Expected a hash" unless ref($oid_data) eq 'HASH';
+  die "Invalid secret" unless ($oid_data->{secret} || '') eq $secret;
+  my $h = BSSQLite::connectdb($db_file) || die "Can't open database";
+  for my $arg (qw(project package filename rev sha256 size)) {
+    die "Missing argument $arg" unless defined $oid_data->{$arg};
+  }
+  BSSQLite::dbdo_bind($h, "INSERT OR IGNORE INTO lfs_oids(project,package,filename,rev,sha256,size) VALUES(?,?,?,?,?,?);",
+    [$oid_data->{project}, SQL_VARCHAR],
+    [$oid_data->{package}, SQL_VARCHAR],
+    [$oid_data->{filename}, SQL_VARCHAR],
+    [$oid_data->{rev}, SQL_VARCHAR],
+    [$oid_data->{sha256}, SQL_VARCHAR],
+    [$oid_data->{size}, SQL_INTEGER]);
 }
 
 sub getgitlfs {
@@ -129,9 +151,10 @@ sub dispatch {
 # define server
 my $dispatches = [
   '/' => \&hello,
-  'GET:/check/$oid/$size' => \&checkoid,
+  'GET:/check/$oid/$size' => \&check_oid,
   'POST:/gitlfs/objects/batch' => \&getgitlfs,
   'POST:/gitlfs/locks/verify' => \&dummylock,
+  'POST:/register' => \&add_oid,
 ];
 
 sub verify_oid {
@@ -150,6 +173,11 @@ my $conf = {
   'maxchild' => 20,
   'verifiers' => {oid => \&verify_oid, size => \&verify_num},
 };
+
+if (open(my $fh, "<", $secret_file)) {
+  $secret = <$fh>;
+  chomp $secret;
+}
 
 BSDispatch::compile($conf);
 BSServer::serveropen($conf->{'port'});
