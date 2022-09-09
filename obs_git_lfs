@@ -19,7 +19,7 @@
 ################################################################
 #
 # OBS Git LFS provider
-# 
+#
 # This service answers git LFS requests and let OBS deliver the files
 # based on a static database.
 #
@@ -29,9 +29,9 @@
 #
 
 BEGIN {
-  my ($wd) = $0 =~ m-(.*)/- ;
+  my ($wd) = $0 =~ m-(.*)/-;
   $wd ||= '.';
-  unshift @INC,  "$wd";
+  unshift @INC, "$wd";
 }
 
 use Data::Dumper;
@@ -52,14 +52,14 @@ sub checkoid {
   my ($cgi, $oid, $size) = @_;
 
   my $h = BSSQLite::connectdb($db_file);
-  my $resp = { oid => $oid, size => int($size) };
+  my $resp = {oid => $oid, size => int($size)};
   my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ? LIMIT 1", lc($oid), $size);
   if (@ary != 4) {
-	  BSServer::reply("No such OID\n", "Status: 404 not_found");
+    BSServer::reply("No such OID\n", "Status: 404 not_found");
   } else {
-	  my ($projid, $packid, $filename, $md5) = @ary;
-	  my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
-	  return ($url, 'Content-Type: text/plain');
+    my ($projid, $packid, $filename, $md5) = @ary;
+    my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename") . "?rev=$md5";
+    return ($url, 'Content-Type: text/plain');
   }
 }
 
@@ -79,22 +79,22 @@ sub getgitlfs {
   for my $obj (@{$batch->{'objects'}}) {
     my $oid = $obj->{'oid'};
     my $size = $obj->{'size'};
-    my $r = { oid => $oid, size => int($size) };
+    my $r = {oid => $oid, size => int($size)};
     my @ary = BSSQLite::selectrow($h, "SELECT project,package,filename,rev FROM lfs_oids WHERE sha256 = ? AND size = ?", lc($oid), $size);
     #  print Dumper(@ary);
     if (@ary != 4) {
       print "$oid/$size: not found\n";
       if ($batch->{'operation'} eq 'upload') {
-         $r->{'error'} = { code => 403, message => 'LFS Upload is not supported by this read only server, check your .lfsconfig file' };
+        $r->{'error'} = {code => 403, message => 'LFS Upload is not supported by this read only server, check your .lfsconfig file'};
       } else {
-         $r->{'error'} = { code => 404, message => 'Object does not exist' };
+        $r->{'error'} = {code => 404, message => 'Object does not exist'};
       }
     } elsif ($batch->{'operation'} eq 'download') {
       my ($projid, $packid, $filename, $md5) = @ary;
-      my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename")."?rev=$md5";
+      my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename") . "?rev=$md5";
       print "$oid/$size: $url\n";
       $r->{'authenticated'} = JSON::XS::true;
-      $r->{'actions'} = { download => { href => $url } };
+      $r->{'actions'} = {download => {href => $url}};
     }
     push @resobj, $r;
   }
@@ -148,7 +148,7 @@ my $conf = {
   'errorreply' => \&errorreply,
   'setkeepalive' => 1,
   'maxchild' => 20,
-  'verifiers' => { oid => \&verify_oid, size => \&verify_num },
+  'verifiers' => {oid => \&verify_oid, size => \&verify_num},
 };
 
 BSDispatch::compile($conf);
