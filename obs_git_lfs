@@ -46,8 +46,8 @@ use strict;
 my $port = 9999;
 my $proto = 'http';
 
-my $db_file = "/etc/obs-git-lfs.db";
-my $secret_file = "/etc/obs-git-lfs.secret";
+my $db_file = "/etc/obs-git-lfs/database";
+my $secret_file = "/etc/obs-git-lfs/secret";
 
 my $secret;
 
