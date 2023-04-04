@@ -46,6 +46,8 @@ use strict;
 my $port = 9999;
 my $proto = 'http';
 
+my $base_url = "https://api.opensuse.org/public";
+my $base_url_file = "/etc/obs-git-lfs/base_url";
 my $db_file = "/etc/obs-git-lfs/database";
 my $secret_file = "/etc/obs-git-lfs/secret";
 
@@ -61,7 +63,7 @@ sub check_oid {
     BSServer::reply("No such OID\n", "Status: 404 not_found");
   } else {
     my ($projid, $packid, $filename, $md5) = @ary;
-    my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename") . "?rev=$md5";
+    my $url = BSHTTP::urlencode("$base_url/source/$projid/$packid/$filename") . "?rev=$md5";
     return ($url, 'Content-Type: text/plain');
   }
 }
@@ -174,6 +176,12 @@ my $conf = {
   'verifiers' => {oid => \&verify_oid, size => \&verify_num},
 };
 
+if (-e $base_url_file) {
+  if (open(my $fh, "<", $base_url_file)) {
+    $base_url = <$fh>;
+    chomp $base_url;
+  }
+}
 if (open(my $fh, "<", $secret_file)) {
   $secret = <$fh>;
   chomp $secret;
