@@ -1,0 +1,17 @@
+[Unit]
+Description=OBS GIT LFS read only provider
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=obs-git-lfs
+Group=users
+Restart=always
+#RuntimeMaxSec=21600
+WorkingDirectory=/usr/share/git-lfs-ro-server/
+ExecStart=/usr/share/git-lfs-ro-server/obs_git_lfs
+
+[Install]
+WantedBy=multi-user.target
+
