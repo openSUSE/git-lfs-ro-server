@@ -53,6 +53,18 @@ my $secret_file = "/etc/obs-git-lfs/secret";
 
 my $secret;
 
+sub make_url {
+  my ($url, @args) = @_;
+  if ($url =~ /^(https?:\/\/[^\/]*\/)(.*)$/s) {
+    $url = $1;
+    $url .= BSHTTP::urlencode($2);
+  } else {
+    $url .= BSHTTP::urlencode($url);
+  }
+  $url .= (($url =~ /\?/) ? '&' : '?') . BSHTTP::queryencode(@args) if @args;
+  return $url;
+}
+
 sub check_oid {
   my ($cgi, $oid, $size) = @_;
 
@@ -63,7 +75,7 @@ sub check_oid {
     BSServer::reply("No such OID\n", "Status: 404 not_found");
   } else {
     my ($projid, $packid, $filename, $md5) = @ary;
-    my $url = BSHTTP::urlencode("$base_url/source/$projid/$packid/$filename") . "?rev=$md5";
+    my $url = make_url("$base_url/source/$projid/$packid/$filename", "rev=$md5");
     return ($url, 'Content-Type: text/plain');
   }
 }
@@ -115,7 +127,7 @@ sub getgitlfs {
       }
     } elsif ($batch->{'operation'} eq 'download') {
       my ($projid, $packid, $filename, $md5) = @ary;
-      my $url = BSHTTP::urlencode("https://api.opensuse.org/public/source/$projid/$packid/$filename") . "?rev=$md5";
+      my $url = make_url("$base_url/source/$projid/$packid/$filename", "rev=$md5");
       print "$oid/$size: $url\n";
       $r->{'authenticated'} = JSON::XS::true;
       $r->{'actions'} = {download => {href => $url}};
