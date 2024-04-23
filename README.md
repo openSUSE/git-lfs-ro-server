@@ -12,7 +12,7 @@ which are supposed to be actively maintained in git directly.
 
 is the server component. It requires the database to be available in
 
-  /etc/obs-git-lfs.db
+  /var/lib/obs-git-lfs/database
 
 It runs by default on port 9999 with plain http (no ssl as security is
 provided via sha256 checksums).

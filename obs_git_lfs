@@ -48,7 +48,7 @@ my $proto = 'http';
 
 my $base_url = "https://api.opensuse.org/public";
 my $base_url_file = "/etc/obs-git-lfs/base_url";
-my $db_file = "/etc/obs-git-lfs/database";
+my $db_file = "/var/lib/obs-git-lfs/database";
 my $secret_file = "/etc/obs-git-lfs/secret";
 
 my $secret;
